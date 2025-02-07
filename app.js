@@ -1,62 +1,142 @@
-const express = require('express');
-const expressLayouts = require('express-ejs-layouts');
-const mongoose = require('mongoose');
-const passport = require('passport');
-const flash = require('connect-flash');
-const session = require('express-session');
+let path       = require('path');
+let logger     = require('morgan');
+let express    = require('express');
+let bodyParser = require('body-parser');
 
-const app = express();
+let app        = express();
 
-// Passport Config
-require('./config/passport')(passport);
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'hjs');
 
-// DB Config
-const db = require('./config/keys').mongoURI;
+//
+//	Check for HTTPS
+//
+app.use(force_https);
 
-// Connect to MongoDB
-mongoose
-  .connect(
-    db,
-    { useNewUrlParser: true ,useUnifiedTopology: true}
-  )
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log(err));
+//
+//	Expose the public folder to the world
+//
+app.use(express.static(path.join(__dirname, 'public')));
 
-// EJS
-app.use(expressLayouts);
-app.set('view engine', 'ejs');
+//
+//	Remove the information about what type of framework is the site running on
+//
+app.disable('x-powered-by');
 
-// Express body parser
-app.use(express.urlencoded({ extended: true }));
+//
+// HTTP request logger middleware for node.js
+//
+app.use(logger('dev'));
 
-// Express session
-app.use(
-  session({
-    secret: 'secret',
-    resave: true,
-    saveUninitialized: true
-  })
-);
+//
+//	Parse all request as regular text, and not JSON objects
+//
+app.use(bodyParser.json());
 
-// Passport middleware
-app.use(passport.initialize());
-app.use(passport.session());
+//
+//	Parse application/x-www-form-urlencoded
+//
+app.use(bodyParser.urlencoded({ extended: false }));
 
-// Connect flash
-app.use(flash());
+//////////////////////////////////////////////////////////////////////////////
 
-// Global variables
+app.use('/', require('./routes/index'));
+app.use('/video', require('./routes/video'));
+
+//////////////////////////////////////////////////////////////////////////////
+
+//
+//
+//  If nonce of the above routes matches, we create an error to let the
+//  user know that the URL accessed doesn't match anything.
+//
 app.use(function(req, res, next) {
-  res.locals.success_msg = req.flash('success_msg');
-  res.locals.error_msg = req.flash('error_msg');
-  res.locals.error = req.flash('error');
-  next();
+
+	let err = new Error('Not Found');
+		err.status = 404;
+
+	next(err);
+
 });
 
-// Routes
-app.use('/', require('./routes/index.js'));
-app.use('/users', require('./routes/users.js'));
+//
+//  Display any error that occurred during the request.
+//
+app.use(function(err, req, res, next) {
 
-const PORT = process.env.PORT || 5000;
+	//
+	//	1.	Set the basic information about the error, that is going to be
+	//		displayed to user and developers regardless.
+	//
+	let obj_message = {
+		message: err.message
+	};
 
-app.listen(PORT, console.log(`Server running on  ${PORT}`));
+	//
+	//	2.	Check if the environment is development, and if it is we
+	//		will display the stack-trace
+	//
+	if(process.env.NODE_ENV == 'development')
+	{
+		//
+		//	1.	Set the variable to show the stack-trace to the developer
+		//
+		obj_message.error = err;
+
+		//
+		//	-> Show the error in the console
+		//
+		console.error(err);
+	}
+
+	//
+	//	3.	Display a default status error, or pass the one from
+	//		the error message
+	//
+	res.status(err.status || 500);
+
+	//
+	//	->	Show the error
+	//
+	res.json(obj_message);
+
+});
+
+//   _    _ ______ _      _____  ______ _____   _____
+//  | |  | |  ____| |    |  __ \|  ____|  __ \ / ____|
+//  | |__| | |__  | |    | |__) | |__  | |__) | (___
+//  |  __  |  __| | |    |  ___/|  __| |  _  / \___ \
+//  | |  | | |____| |____| |    | |____| | \ \ ____) |
+//  |_|  |_|______|______|_|    |______|_|  \_\_____/
+//
+
+//
+//	Check if the connection is secure, if not, redirect to a secure one.
+//
+function force_https(req, res, next)
+{
+	//
+	//	1. 	Redirect only in the production environment
+	//
+	if(process.env.NODE_ENV == 'production')
+	{
+		//
+		//	1. 	Check what protocol are we using
+		//
+		if(req.headers['x-forwarded-proto'] !== 'https')
+		{
+			//
+			//	-> 	Redirect the user to the same URL that he requested, but
+			//		with HTTPS instead of HTTP
+			//
+			return res.redirect('https://' + req.get('host') + req.url);
+		}
+	}
+
+	//
+	//	2. 	If the protocol is already HTTPS the, we just keep going.
+	//
+	next();
+}
+
+module.exports = app;

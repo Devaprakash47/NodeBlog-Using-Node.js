@@ -1,23 +1,27 @@
-# Node.js & Passport Login
+# How to Stream a Movie to a HTML 5 video tag using NodeJS
 
-This is a user login and registration app using Node.js, Express, Passport, Mongoose, EJS and some other packages.
+This is a very quick and easy **article** explaining how to stream movies to an HTML 5 video tag using NodeJS. The whole project is very small and compact. The `video.js` file is where you shoud focus your attention. The file is in the `routes` folder.
 
-### Version: 2.0.0
+# But first, what are streams?
 
-### Usage
+If you never dealt with streams, you might think to yourself, why not just link the movie file straight to the video tag? If we do that, the whole movie file might be loaded into memory on the server side. Now you may be thinking, but this file is just 30MB in size, so what is the problem?
 
-```sh
-$ npm install
-```
+Well, imagine that you have 16GB of RAM on the server, but you have a 20GB video file on the drive. What now? How would you load such a massive file that exceeds the RAM capacity? Streams are the answer 😎.
 
-```sh
-$ npm start
-# Or run with Nodemon
-$ npm run dev
+With streams, you have your file on disk, sitting there and having a good time. By using the [.createReadStream()](https://github.com/Devaprakash47/How_To_Stream_Movies_Using_Node.js.git) method, and telling it which part of the file you're interested in, you will just get a chunk of the whole thing. For example, just 1MB. Then you take that 1MB, send it to whoever requested it, and you're done.
 
-# Visit http://localhost:5000
-```
+If you are interested in learninig more about Streams, check out this other article that I wrote, titled: [How-to-Understand-Streams-in-NodeJS]( https://github.com/Devaprakash47/How_To_Stream_Movies_Using_Node.js.git).
 
-### MongoDB
+# The high level code explanation
 
-Open "config/keys.js" and add your MongoDB URI, local or Atlas
+As you can see from the code, the front end part of the project is super basic. The only thing that matters is the HTML 5 video tag and his URL to the resource of the video. Which, in this case, is a URL to a NodeJS `route` that:
+
+1. Checks the request to see how much data the video tag requested
+1. Opens the movie file as a stream
+1. Reads the requested chunks
+1. Sends back the data with the response
+
+And this is it. The video tag will keep making requests to the provided URL until it gets the whole movie. The only job for your code is to keep reading parts of the file that the tag asks for.
+
+
+

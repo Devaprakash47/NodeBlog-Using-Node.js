@@ -1,15 +1,16 @@
-const express = require('express');
-const router = express.Router();
-const { ensureAuthenticated, forwardAuthenticated } = require('../config/auth');
+let express = require('express');
 
-// Welcome Page
-router.get('/', forwardAuthenticated, (req, res) => res.render('welcome'));
+let router  = express.Router();
 
-// Dashboard
-router.get('/dashboard', ensureAuthenticated, (req, res) =>
-  res.render('dashboard', {
-    user: req.user
-  })
-);
+router.get('/', function(req, res, next) {
+
+	//
+	//	->	Display the index view with the video tag
+	//
+	res.render('index', {
+		base_url: process.env.BASE_URL
+	});
+
+});
 
 module.exports = router;
