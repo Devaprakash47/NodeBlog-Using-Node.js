@@ -1,142 +1,121 @@
-let path       = require('path');
-let logger     = require('morgan');
-let express    = require('express');
-let bodyParser = require('body-parser');
+var express = require('express');
+var path = require('path');
+var favicon = require('serve-favicon');
+var logger = require('morgan');
+var expressValidator = require('express-validator');
+var cookieParser = require('cookie-parser');
+var session = require('express-session');
+var bodyParser = require('body-parser');
+//var multer = require('multer');
 
-let app        = express();
 
+var mongo = require('mongodb');
+var db = require('monk')('localhost/nodeblog');
+
+var flash = require('connect-flash');
+var routes = require('./routes/index');
+var categories = require('./routes/categories')
+
+
+
+var app = express();
+
+app.locals.moment = require('moment');
+app.locals.truncateText = function(text, length){
+  var truncatedText = text.substring(0, length);
+  return truncatedText;
+};
+// view engine setup
 app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'hjs');
+app.set('view engine', 'jade');
 
-//
-//	Check for HTTPS
-//
-app.use(force_https);
+//app.use( multer({dest: './public/images/uploads'}).single('thumbimage'));
 
-//
-//	Expose the public folder to the world
-//
-app.use(express.static(path.join(__dirname, 'public')));
-
-//
-//	Remove the information about what type of framework is the site running on
-//
-app.disable('x-powered-by');
-
-//
-// HTTP request logger middleware for node.js
-//
+// uncomment after placing your favicon in /public
+//app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
-
-//
-//	Parse all request as regular text, and not JSON objects
-//
 app.use(bodyParser.json());
-
-//
-//	Parse application/x-www-form-urlencoded
-//
 app.use(bodyParser.urlencoded({ extended: false }));
 
-//////////////////////////////////////////////////////////////////////////////
+var posts = require('./routes/posts');
 
-app.use('/', require('./routes/index'));
-app.use('/video', require('./routes/video'));
+// Handle session
+app.use(session({
+	secret: 'sonic',
+	saveUninitialized: true,
+	resave: true
+}));
 
-//////////////////////////////////////////////////////////////////////////////
-
-//
-//
-//  If nonce of the above routes matches, we create an error to let the
-//  user know that the URL accessed doesn't match anything.
-//
-app.use(function(req, res, next) {
-
-	let err = new Error('Not Found');
-		err.status = 404;
-
-	next(err);
-
-});
-
-//
-//  Display any error that occurred during the request.
-//
-app.use(function(err, req, res, next) {
-
-	//
-	//	1.	Set the basic information about the error, that is going to be
-	//		displayed to user and developers regardless.
-	//
-	let obj_message = {
-		message: err.message
-	};
-
-	//
-	//	2.	Check if the environment is development, and if it is we
-	//		will display the stack-trace
-	//
-	if(process.env.NODE_ENV == 'development')
-	{
-		//
-		//	1.	Set the variable to show the stack-trace to the developer
-		//
-		obj_message.error = err;
-
-		//
-		//	-> Show the error in the console
-		//
-		console.error(err);
-	}
-
-	//
-	//	3.	Display a default status error, or pass the one from
-	//		the error message
-	//
-	res.status(err.status || 500);
-
-	//
-	//	->	Show the error
-	//
-	res.json(obj_message);
-
-});
-
-//   _    _ ______ _      _____  ______ _____   _____
-//  | |  | |  ____| |    |  __ \|  ____|  __ \ / ____|
-//  | |__| | |__  | |    | |__) | |__  | |__) | (___
-//  |  __  |  __| | |    |  ___/|  __| |  _  / \___ \
-//  | |  | | |____| |____| |    | |____| | \ \ ____) |
-//  |_|  |_|______|______|_|    |______|_|  \_\_____/
-//
-
-//
-//	Check if the connection is secure, if not, redirect to a secure one.
-//
-function force_https(req, res, next)
-{
-	//
-	//	1. 	Redirect only in the production environment
-	//
-	if(process.env.NODE_ENV == 'production')
-	{
-		//
-		//	1. 	Check what protocol are we using
-		//
-		if(req.headers['x-forwarded-proto'] !== 'https')
-		{
-			//
-			//	-> 	Redirect the user to the same URL that he requested, but
-			//		with HTTPS instead of HTTP
-			//
-			return res.redirect('https://' + req.get('host') + req.url);
+// Validator
+app.use(expressValidator({
+	errorFormatter: function(param, msg, value){
+		var namespace = param.split('.'),
+		root = namespace.shift(),
+		formParam = root;
+		
+		while(namespace.length){
+			formParam += '[' + namespace.shift() + ']';
+		}
+		
+		return{
+			param: formParam,
+			msg: msg,
+			value: value
 		}
 	}
+}));
 
-	//
-	//	2. 	If the protocol is already HTTPS the, we just keep going.
-	//
+
+
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use(flash());
+app.use(function(req, res, next){
+	res.locals.messages = require('express-messages')(req,res);
 	next();
+});
+
+// access db
+app.use(function(req, res, next){
+	req.db = db;
+	next();
+});
+
+app.use('/', routes);
+app.use('/posts', posts);
+app.use('/categories', categories);
+
+// catch 404 and forward to error handler
+app.use(function(req, res, next) {
+  var err = new Error('Not Found');
+  err.status = 404;
+  next(err);
+});
+
+// error handlers
+
+// development error handler
+// will print stacktrace
+if (app.get('env') === 'development') {
+  app.use(function(err, req, res, next) {
+    res.status(err.status || 500);
+    res.render('error', {
+      message: err.message,
+      error: err
+    });
+  });
 }
+
+// production error handler
+// no stacktraces leaked to user
+app.use(function(err, req, res, next) {
+  res.status(err.status || 500);
+  res.render('error', {
+    message: err.message,
+    error: {}
+  });
+});
+
 
 module.exports = app;

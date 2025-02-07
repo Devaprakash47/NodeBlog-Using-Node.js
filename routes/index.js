@@ -1,16 +1,15 @@
-let express = require('express');
+var express = require('express');
+var router = express.Router();
+var mongo = require('mongodb');
+var db = require('monk')('localhost/nodeblog');
 
-let router  = express.Router();
-
+/* GET home page. */
 router.get('/', function(req, res, next) {
-
-	//
-	//	->	Display the index view with the video tag
-	//
-	res.render('index', {
-		base_url: process.env.BASE_URL
-	});
-
+  var db = req.db;
+  var posts = db.get('posts');
+  posts.find({}, {}, function(err, posts){
+    res.render('index', {"posts": posts, "title": "Home"});
+  });
 });
 
 module.exports = router;
