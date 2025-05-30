@@ -15,4 +15,4 @@ Final Show Case
 - Adding passport from the previous project.
 - Restrict blog post to admin.
 - Restrict comments to users.
-- Adding RSS and Email notifications for new posts.
+- Adding RSS and Email notifications for new posts. 
